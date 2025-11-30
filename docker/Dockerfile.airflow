@@ -1,0 +1,22 @@
+FROM apache/airflow:2.9.1
+
+USER root
+
+# Install ffmpeg and other system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+# Install Python dependencies
+# We install the same dependencies as the project needs for splitting
+RUN pip install --no-cache-dir \
+    google-cloud-storage \
+    scenedetect[opencv] \
+    python-dotenv \
+    asyncpg \
+    vertexai

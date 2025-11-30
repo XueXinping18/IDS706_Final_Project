@@ -1,0 +1,95 @@
+version: '3.8'
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://user:password@postgres:5432/airflow_db
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+    # Project Env Vars for the script
+    GCP_PROJECT: ${GCP_PROJECT}
+    GCP_REGION: ${GCP_REGION}
+    RAW_BUCKET: ${RAW_BUCKET}
+    HLS_BUCKET: ${HLS_BUCKET}
+    TRANSCRIPT_BUCKET: ${TRANSCRIPT_BUCKET}
+    REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
+    GEMINI_MODEL: ${GEMINI_MODEL}
+    GOOGLE_APPLICATION_CREDENTIALS: /app/sa-key.json
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ../src:/app/src
+    - ../scripts:/app/scripts
+    - ../resources:/app/resources
+    - ../sa-key.json:/app/sa-key.json
+    - ../.env:/app/.env
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    - postgres
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ingestion_db
+      # Airflow needs its own DB, we can create it in init.sql or just use same PG instance
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/ingestion_db
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
+    depends_on:
+      - postgres
+    volumes:
+      - ../src:/app/src
+    command: python src/ingestion_worker/worker_pull.py
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"' ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  airflow-init:
+    <<: *airflow-common
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: 'admin'
+      _AIRFLOW_WWW_USER_PASSWORD: 'admin'
+    user: "0:0"
+
+volumes:
+  postgres_data:

@@ -302,3 +302,23 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) is configured to:
 2.  Set up a clean Python environment.
 3.  Install dependencies.
 4.  Run the default test (`pytest`).
+
+## 8. Team Contributions
+
+This project was a collaborative effort by the team over the course of 3 weeks.
+
+*   **Xinping Xue (Backend Engineer)**:
+    *   Implemented the core **Ingestion Worker** and Event-Driven (Pub/Sub) system.
+    *   Designed the persistence layer and idempotency mechanisms.
+    *   Set up docker orchestration and CI/CD pipelines.
+
+*   **Patrick Zhu (Backend Engineer)**:
+    *   Implement various components in infrastructure and domain layer.
+    *   Developed part of the agentic logic with Gemini 2.5 Flash.
+    *   Implemented Vertex integration and Transcoder API connections.
+
+*   **Yuqian Wang (Data Scientist)**:
+    *   Developed the **Analytics Engine** using Polars for high-performance ETL.
+    *   Trained the Machine Learning model (Scikit-Learn) for difficulty prediction.
+    *   Conducted SQL analysis and generated data insights.
+
